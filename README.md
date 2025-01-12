@@ -27,7 +27,11 @@ you can use it in your code and make your own ascii art !
 
 ## Example
 
+* Black Myth: Wukong
+
 ![example](./example/wukong.jpg)
+
+* The Matrix: Neo
 
 ![neo](./example/neo.gif)
 
