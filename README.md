@@ -5,9 +5,9 @@ Convert Image/Video to ASCII art.
 
 ![example](./example/wukong.jpg)
 
-![example2](./example/doulai.jpg)
-
 ![neo](./example/neo.gif)
+
+![example2](./example/doulai.jpg)
 
 ## Prerequisites
 
