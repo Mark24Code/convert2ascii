@@ -3,6 +3,10 @@
 Convert Image/Video to ASCII art.
 
 
+![example](./example/wukong.jpg)
+
+
+
 ## Prerequisites
 
 * Ruby3+
