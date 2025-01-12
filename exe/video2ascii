@@ -1,0 +1,111 @@
+#!/usr/bin/env ruby
+require 'optparse'
+require_relative "../lib/convert2ascii/video2ascii"
+require_relative "../lib/convert2ascii/terminal-player"
+
+
+def get_name_order(name_path)
+  if name_path
+    return File.basename(name_path, ".*").to_i
+  end
+end
+
+def play_frames(dist_dir, play_loop: false)
+
+  config = JSON.parse(File.read(File.join(dist_dir, "meta.json")))
+  step_duration = config["step_duration"]
+  audio_name = config["audio"]
+  audio = File.join(dist_dir, audio_name)
+
+  frames_path = Dir.glob("#{dist_dir}/*.txt")
+  frames_path = frames_path.sort do |a, b|
+    get_name_order(a) <=> get_name_order(b)
+  end
+
+  # TODO
+  # 载入内存中可能会遇到过大的问题
+  frames = frames_path.map { |f| File.open(f).read }
+  Convert2Ascii::TerminalPlayer.new(frames: frames, audio: audio, play_loop: play_loop, step_duration: step_duration).play
+end
+
+
+options = {}
+OptionParser.new do |parser|
+  parser.banner = <<DOC
+Usage: video2ascii [options]
+
+* default will generate and play without save.
+* -p will just play ascii frames dir and ignore -i, -o others options
+* -i,-o will just generate and output frames and ignore others options
+DOC
+  parser.on("--version", "verison") do |v|
+    puts "convert2ascii/video2ascii: v#{::Convert2Ascii::VERSION}"
+    puts "author: Mark24"
+    puts "mail: mark.zhangyoung@gmail.com"
+    puts "project: https://github.com/mark24Code/convert2ascii"
+    return
+  end
+
+  parser.on("-iURI", "--input=URI", "video uri (required)") do |uri|
+    options[:uri] = uri
+
+    # check options
+    unless options[:uri]
+      puts "Error: --video option is required."
+      exit 1
+    end
+  end
+
+  parser.on("-wWIDTH", "--width=WIDTH", Integer ,"video width (integer)") do |width|
+    options[:width] = width
+  end
+
+  parser.on("-sSTYLE", "--style=STYLE", "ascii style: ['color'| 'text']") do |style|
+    options[:style] = style
+
+    styles = ["color", "text"]
+    # check options
+    unless styles.include? options[:style]
+      puts "Error: --style option must be [\"color\" | \"text\"]."
+      exit 1
+    end
+  end
+
+  parser.on("-b", "--block", "ascii color style use BLOCK or not [ true | false ] ") do |color_block|
+    options[:color_block] = color_block || false
+  end
+
+  parser.on("-o", "--ouput=OUTPUT", "save ascii frame to output dirname") do |output|
+    options[:output] = output
+  end
+
+  parser.on("-p", "--play_dir=PLAY_DIRNAME", "input ascii frames dirname to play") do |play_dir|
+    options[:play_dir] = play_dir
+  end
+end.parse!
+
+if options[:play_dir]
+  # play frames
+  # TODO
+  # 导出文件必须包含更多信息 step_duration
+  play_frames(options[:play_dir])
+  exit 0
+end
+
+payload = {
+  uri: options[:uri],
+  width: options[:width],
+  style: options[:style],
+  color_block: options[:color_block],
+}
+
+if options[:uri] and options[:output]
+  output = options[:output]
+
+  Convert2Ascii::Video2Ascii.new(**payload).generate.save(output)
+
+  exit 0
+end
+
+
+Convert2Ascii::Video2Ascii.new(**payload).generate.play
