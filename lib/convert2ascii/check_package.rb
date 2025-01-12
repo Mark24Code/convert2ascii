@@ -141,7 +141,7 @@ module Convert2Ascii
     end
 
     def macos_check
-      if !macos_package_installed?(@name)
+      if !macos_installed?(@name)
         raise CheckPackageError, "\n#{@need_error}\n#{@tips}\n"
       end
     end
