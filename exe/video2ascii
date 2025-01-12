@@ -35,7 +35,7 @@ OptionParser.new do |parser|
 Usage: video2ascii [options]
 
 * default will generate and play without save.
-* -p will just play ascii frames dir and ignore -i, -o others options
+* -p will just play ascii frames dir, and ignore -i, -o others options. --loop will play loop
 * -i,-o will just generate and output frames and ignore others options
 DOC
   parser.on("--version", "verison") do |v|
@@ -82,13 +82,22 @@ DOC
   parser.on("-p", "--play_dir=PLAY_DIRNAME", "input ascii frames dirname to play") do |play_dir|
     options[:play_dir] = play_dir
   end
+
+  parser.on("--loop", "play loop") do |play_loop|
+    options[:play_loop] = play_loop
+  end
 end.parse!
 
 if options[:play_dir]
   # play frames
   # TODO
   # 导出文件必须包含更多信息 step_duration
-  play_frames(options[:play_dir])
+  play_loop = false
+
+  if options[:play_loop]
+    play_loop = options[:play_loop]
+  end
+  play_frames(options[:play_dir], play_loop: play_loop)
   exit 0
 end
 
