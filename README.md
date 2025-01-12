@@ -49,6 +49,14 @@ you can use it in your code and make your own ascii art !
 
 >  `$(pwd)` can be changed to your local path. Here, use your working path.
 
+```bash
+# image
+image2ascii -i </path/to/image>
+
+# video 
+video2ascii -i </path/to/video.mp4>
+```
+
 
 ## Install
 
