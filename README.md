@@ -24,6 +24,19 @@ Convert Image/Video to ASCII art.
 * ImageMagick ([Download here](https://imagemagick.org/script/download.php))
 * ffmpeg ([Download here](https://www.ffmpeg.org/))
 
+# How to use
+
+## Try in docker
+
+`$ docker run -it -v $(pwd):/app  mark24code/convert2ascii bash -c "cd /app && exec bash"`
+
+> `$(pwd)` can change to your local path, here use you working path.
+
+
+## Install
+
+`gem install convert2ascii`
+
 
 ## Executable command
 
@@ -107,6 +120,7 @@ ascii.play
 ascii.generate.play
 
 ```
+
 
 ## Inspired by
 
