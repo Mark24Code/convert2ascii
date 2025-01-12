@@ -31,8 +31,6 @@ you can use it in your code and make your own ascii art !
 
 ![neo](./example/neo.gif)
 
-![example2](./example/doulai.jpg)
-
 ## Prerequisites
 
 * Ruby 3+
