@@ -62,7 +62,7 @@ module Convert2Ascii
       File.open("#{output_dir}/meta.json", "w") do |f|
         config = {
           step_duration: @step_duration,
-          audio: File.basename(@audio),
+          audio: @audio ?  File.basename(@audio) : nil,
           frames_count: @frames_path.length
         }
         json_data = JSON.generate(config, pretty: true)
@@ -125,7 +125,7 @@ module Convert2Ascii
       cmd = "ffmpeg -i '#{@uri}' -vn  -nostats -loglevel 0   #{audio_save}"
       result = system(cmd)
       if !result
-        raise Video2AsciiError, Rainbow("\n[Error] exec `#{cmd}` fail!").red
+        audio_save = nil
       end
       puts Rainbow("[info] parsing audio done.").green
 

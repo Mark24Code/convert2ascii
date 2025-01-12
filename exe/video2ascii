@@ -15,7 +15,7 @@ def play_frames(dist_dir, play_loop: false)
   config = JSON.parse(File.read(File.join(dist_dir, "meta.json")))
   step_duration = config["step_duration"]
   audio_name = config["audio"]
-  audio = File.join(dist_dir, audio_name)
+  audio = audio_name ? File.join(dist_dir, audio_name) : nil
 
   frames_path = Dir.glob("#{dist_dir}/*.txt")
   frames_path = frames_path.sort do |a, b|
