@@ -6,8 +6,8 @@ Convert Image/Video to ASCII art.
 ## Prerequisites
 
 * Ruby3+
-* ImageMagick ([Downloaded](https://imagemagick.org/script/download.php) here)
-  * MacOS `brew install imagemagick`
+* ImageMagick ([Download here](https://imagemagick.org/script/download.php))
+* ffmpeg ([Download here](https://www.ffmpeg.org/))
 
 
 ## Inspired by
