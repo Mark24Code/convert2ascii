@@ -1,0 +1,6 @@
+# Slice Images
+threads: 9 time: 0.965266
+
+# Thread 9
+ruby test.rb  34.27s user 0.89s system 122% cpu 28.585 total
+ruby test.rb  38.87s user 0.90s system 120% cpu 33.061 total
