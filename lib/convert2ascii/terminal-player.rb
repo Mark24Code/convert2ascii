@@ -115,15 +115,14 @@ module Convert2Ascii
       if @audio
         Thread.new do
           start_time = Time.now # 以音频为准
-          system("ffplay -nodisp -i #{@audio} &> /dev/null")
+          play_cmd = "ffplay -nodisp "
+          if @play_loop
+            play_cmd << " -loop 0"
+          end
+          system("#{play_cmd} -i #{@audio} &> /dev/null")
           if @debug
             puts Rainbow("[info] audio time: #{Time.now - start_time} s").green
           end
-
-          # TODO control audio play
-          # Open3.popen3("afplay #{@audio}") do |stdin, stdout, stderr, wait_thr|
-          #   # 可以在这里处理输出或错误信息
-          # end
         end
       end
       frame_index = 0
