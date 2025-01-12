@@ -45,7 +45,7 @@ Usage: video2ascii [options]
 * -p will just play ascii frames dir, and ignore -i, -o others options. --loop will play loop
 * -i,-o will just generate and output frames and ignore others options
 DOC
-  parser.on("--version", "verison") do |v|
+  parser.on("--version", "version") do |v|
     puts "convert2ascii/video2ascii: v#{::Convert2Ascii::VERSION}"
     puts "author: Mark24"
     puts "mail: mark.zhangyoung@gmail.com"
@@ -82,11 +82,11 @@ DOC
     options[:color_block] = color_block || false
   end
 
-  parser.on("-o", "--ouput=OUTPUT", "save ascii frame to output dirname") do |output|
+  parser.on("-o", "--ouput=OUTPUT", "save ascii frames to the output directory") do |output|
     options[:output] = output
   end
 
-  parser.on("-p", "--play_dir=PLAY_DIRNAME", "input ascii frames dirname to play") do |play_dir|
+  parser.on("-p", "--play_dir=PLAY_DIRNAME", "input the ascii frames directory to play") do |play_dir|
     options[:play_dir] = play_dir
   end
 

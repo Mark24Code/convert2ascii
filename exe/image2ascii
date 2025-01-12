@@ -7,7 +7,7 @@ options = {}
 OptionParser.new do |parser|
   parser.banner = "Usage: image2ascii [options]"
 
-  parser.on("--version", "verison") do |v|
+  parser.on("--version", "version") do |v|
     puts "convert2ascii/image2ascii: v#{::Convert2Ascii::VERSION}"
     puts "author: Mark24"
     puts "mail: mark.zhangyoung@gmail.com"

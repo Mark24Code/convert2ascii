@@ -1,6 +1,21 @@
-# Convert2ASCII
+# Convert2Ascii
 
 Convert Image/Video to ASCII art.
+
+
+## Intro
+
+convert2ascii provides two executable commands：
+
+* image2ascii: transform picture to ascii art and display in terminal.
+* video2ascii: transform video to ascii art, you can save or play it in terminal.
+
+It also provides classes as a gem:
+
+* Convert2Ascii::Image2Ascii
+* Convert2Ascii::Video2Ascii
+
+you can use it in your code and make your own ascii art !
 
 
 ## Test pass
@@ -20,57 +35,57 @@ Convert Image/Video to ASCII art.
 
 ## Prerequisites
 
-* Ruby3+
+* Ruby 3+
 * ImageMagick ([Download here](https://imagemagick.org/script/download.php))
 * ffmpeg ([Download here](https://www.ffmpeg.org/))
 
 # How to use
 
-## Try in docker
+## Try in Docker
 
 `$ docker run -it -v $(pwd):/app  mark24code/convert2ascii bash -c "cd /app && exec bash"`
 
-> `$(pwd)` can change to your local path, here use you working path.
+>  `$(pwd)` can be changed to your local path. Here, use your working path.
 
 
 ## Install
 
-`gem install convert2ascii`
+`$ gem install convert2ascii`
 
 
-## Executable command
+## Executable commands
 
 ### image2ascii
 
-Make image to ascii art in your terminal.
+Convert an image to ascii art.
 
 ```bash
 image2ascii -h
 Usage: image2ascii [options]
-        --version                    verison
+        --version                    version
     -i, --image=URI                  image uri (required)
     -w, --width=WIDTH                image width (integer)
-    -s, --style=STYLE                ascii style: ['color'| 'text']
-    -b, --block                      ascii color style use BLOCK or not [ true | false ]
+    -s, --style=STYLE                ascii style: 'color'/'text'
+    -b, --block                      ascii color style use BLOCK or not true/false
 ```
 
 ### video2ascii
 
-Make image to ascii art in your terminal.
+Convert a video to ascii art.
 
 ```bash
 Usage: video2ascii [options]
 
-* default will generate and play without save.
-* -p will just play ascii frames dir, and ignore -i, -o others options. --loop will play loop
+* By default, it will generate and play without saving.
+* The -p option will just play the ascii frames within the directory, and ignore -i, -o other options. --loop will play loop
 * -i,-o will just generate and output frames and ignore others options
-        --version                    verison
+        --version                    version
     -i, --input=URI                  video uri (required)
     -w, --width=WIDTH                video width (integer)
     -s, --style=STYLE                ascii style: ['color'| 'text']
     -b, --block                      ascii color style use BLOCK or not [ true | false ]
-    -o, --ouput=OUTPUT               save ascii frame to output dirname
-    -p, --play_dir=PLAY_DIRNAME      input ascii frames dirname to play
+    -o, --ouput=OUTPUT               save ascii frames to the output directory
+    -p, --play_dir=PLAY_DIRNAME      input the ascii frames directory to play
         --loop
 ```
 
