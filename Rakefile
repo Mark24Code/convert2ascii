@@ -9,5 +9,11 @@ task :test do
   end
 end
 
+desc "Build Rdoc"
+task :build_rdoc do
+  system("rdoc build")
+end
+
+
 
 task default: %i[]
