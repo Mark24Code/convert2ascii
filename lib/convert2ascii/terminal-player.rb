@@ -115,7 +115,7 @@ module Convert2Ascii
       if @audio
         Thread.new do
           start_time = Time.now # 以音频为准
-          system("afplay #{@audio}")
+          system("ffplay -nodisp -i #{@audio} &> /dev/null")
           if @debug
             puts Rainbow("[info] audio time: #{Time.now - start_time} s").green
           end
