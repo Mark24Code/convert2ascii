@@ -3,6 +3,15 @@
 Convert Image/Video to ASCII art.
 
 
+## Test pass
+
+* MacOS 15.2 ✅
+* Ubuntu 24.04 ✅
+* Windows 11  ❌
+
+
+## Example
+
 ![example](./example/wukong.jpg)
 
 ![neo](./example/neo.gif)
