@@ -25,7 +25,14 @@ def play_frames(dist_dir, play_loop: false)
   # TODO
   # 载入内存中可能会遇到过大的问题
   frames = frames_path.map { |f| File.open(f).read }
-  Convert2Ascii::TerminalPlayer.new(frames: frames, audio: audio, play_loop: play_loop, step_duration: step_duration).play
+
+  payload = {
+    frames: frames,
+    audio: audio,
+    play_loop: play_loop,
+    step_duration: step_duration
+  }
+  Convert2Ascii::TerminalPlayer.new(**payload).play
 end
 
 

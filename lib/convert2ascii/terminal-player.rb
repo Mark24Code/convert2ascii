@@ -15,6 +15,7 @@ module Convert2Ascii
       @play_loop = args[:play_loop]
       @step_duration = args[:step_duration]
 
+      @total_duration = @frames.length * @step_duration
       @first_frame = true
       @backspace_adjust = "\033[A" * (@frames.length + 1)
 
@@ -153,21 +154,26 @@ module Convert2Ascii
           offset = 1
         end
 
-        frame_index += offset
+        frame_index = (frame_index + offset) % @frames.length
+
+        real_time = Time.now - start_time
+        frame_time = (frame_index + 1) * @step_duration
+
+        if !@play_loop
+          if real_time > @total_duration
+            break
+          end
+        end
 
         if @debug
           puts ""
-          real_time = Time.now - start_time
-          frame_time = (frame_index + 1) * @step_duration
           puts Rainbow("RealTime: #{real_time} s").green
           puts Rainbow("FrameTime: #{frame_time} s").green
+          puts Rainbow("CurrentFrame: #{frame_index} / #{@frames.length} ").green
           puts Rainbow("Real - Frame: #{real_time - frame_time} s").green
           puts Rainbow("[+] #{offset}").green
           puts Rainbow("@step_duration #{@step_duration}").green
-        end
-
-        if !@play_loop && frame_index > @frames.length
-          break
+          puts Rainbow("@play_loop #{@play_loop}").green
         end
       end
     end
