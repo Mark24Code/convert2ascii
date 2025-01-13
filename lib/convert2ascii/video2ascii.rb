@@ -8,7 +8,7 @@ require_relative "./image2ascii"
 require_relative "./terminal-player"
 require_relative "./multi-tasker"
 require_relative "./check_package"
-require_relative './version'
+require_relative "./version"
 
 module Convert2Ascii
   class Video2AsciiError < StandardError
@@ -17,14 +17,14 @@ module Convert2Ascii
   class Video2Ascii
     DEFAULT_STEP_DURATION = 0.04
 
-
     attr_accessor :uri, :width, :threads_count, :output, :step_duration
+
     def initialize(**args)
       @uri = args[:uri]
       @step_duration = args[:step_duration] || DEFAULT_STEP_DURATION
       @threads_count = set_threads_count
 
-      @tmpdir = nil
+      @tmpdir = File.join(Dir.home, ".convert2ascii")
       @output = Dir.pwd
 
       # image2ascii attrs
@@ -43,31 +43,33 @@ module Convert2Ascii
       @color = args[:color] || @color # full
       @color_block = args[:color_block] || @color_block
 
-      @tmpdir = Dir.mktmpdir
+      if File.directory? @tmpdir
+        FileUtils.remove_entry @tmpdir
+      end
+      Dir.mkdir(@tmpdir)
       @audio = get_audio_from_video(@tmpdir)
       screenshots_from_video(@tmpdir)
       convert_all_images(@tmpdir)
       @frames_path = order_frames_path
 
+      # save config
+      File.open("#{@tmpdir}/meta.json", "w") do |f|
+        config = {
+          step_duration: @step_duration,
+          audio: @audio ? File.basename(@audio) : nil,
+          frames_count: @frames_path.length,
+        }
+        json_data = JSON.generate(config, pretty: true)
+        f.puts json_data
+      end
+
       self
     end
-
 
     def save(output_dir)
       system("rm -rf #{@tmpdir}/*.jpg")
       system("rm -rf #{output_dir} && mkdir #{output_dir}")
       system("cp -r #{@tmpdir}/* #{output_dir}")
-
-      # save config
-      File.open("#{output_dir}/meta.json", "w") do |f|
-        config = {
-          step_duration: @step_duration,
-          audio: @audio ?  File.basename(@audio) : nil,
-          frames_count: @frames_path.length
-        }
-        json_data = JSON.generate(config, pretty: true)
-        f.puts json_data
-      end
 
       puts ""
       puts Rainbow("[info] save success!").green
@@ -79,7 +81,7 @@ module Convert2Ascii
         get_name_order(a) <=> get_name_order(b)
       end
 
-      @frames_path =  frames_path
+      @frames_path = frames_path
     end
 
     def play(**args)
@@ -88,11 +90,12 @@ module Convert2Ascii
       frames = @frames_path.map { |f| File.open(f).read }
 
       player_args = {
-        frames: ,
+        frames:,
         audio: @audio,
         play_loop:,
         step_duration:,
       }
+
       TerminalPlayer.new(**player_args).play
 
       return true
@@ -156,7 +159,7 @@ module Convert2Ascii
         width: @width,
         style: @style,
         color: @color,
-        color_block: @color_block
+        color_block: @color_block,
       }
       Image2Ascii.new(uri: image).generate(**config).ascii_string
     end
@@ -169,10 +172,7 @@ module Convert2Ascii
 
     def convert_all_images(save_dir)
       images = Dir.glob("#{save_dir}/*.jpg")
-
-      processed_count = 0
       tasks = []
-      time_start = Time.now
       images.each_with_index do |image, i|
         tasks << lambda {
           begin
@@ -181,9 +181,6 @@ module Convert2Ascii
             File.open("#{@tmpdir}/#{basename}.txt", "w") do |f|
               f.puts ascii_string
             end
-
-            processed_count += 1
-            print(Rainbow("\rprocessing...  #{sprintf("%.2f", (1.0 * processed_count / images.length) * 100)} % (time: #{sprintf("%.2f", Time.now - time_start)} s)").green)
           rescue => error
             puts "-------"
             puts Rainbow("\n[Error] convert_to_ascii -> image: #{image} | i: #{i}").red
@@ -194,6 +191,5 @@ module Convert2Ascii
 
       MultiTasker.new(tasks).run
     end
-
   end
 end

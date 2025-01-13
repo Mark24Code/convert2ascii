@@ -14,7 +14,6 @@ Gem::Specification.new do |spec|
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.1.0"
 
-
   spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = "https://github.com/Mark24Code/convert2ascii"
   spec.metadata["changelog_uri"] = "https://github.com/Mark24Code/convert2ascii"
@@ -36,7 +35,7 @@ Gem::Specification.new do |spec|
   # spec.add_dependency "example-gem", "~> 1.0"
   spec.add_dependency "rmagick", "~> 6.0.1"
   spec.add_dependency "rainbow", "~> 3.1.1"
-  spec.add_dependency "async", "~> 2.21"
+  spec.add_dependency "parallel", "~> 1.26"
   # For more information and examples about making a new gem, check out our
   # guide at: https://bundler.io/guides/creating_gem.html
 end

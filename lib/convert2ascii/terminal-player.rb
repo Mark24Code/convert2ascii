@@ -2,12 +2,15 @@ require "rainbow"
 require_relative "./terminal"
 
 module Convert2Ascii
-  class TerminalPlayer
+  class TerminalPlayerError < StandardError
+  end
 
+  class TerminalPlayer
     SAFE_SLOW_DELTA = 0.9 # seconds
     SAFE_FAST_DELTA = 0.2 # seconds
 
     attr_accessor :play_loop, :step_duration, :debug
+
     def initialize(**args)
       @debug = false
       @audio = args[:audio]
@@ -20,6 +23,13 @@ module Convert2Ascii
       @backspace_adjust = "\033[A" * (@frames.length + 1)
 
       regist_hook
+      check_params
+    end
+
+    def check_params
+      if @frames.length <= 0
+        raise TerminalPlayerError, "\n[Error] frame's length must be >= 0 "
+      end
     end
 
     def play
@@ -76,7 +86,7 @@ module Convert2Ascii
     end
 
     def debug_log(var_name)
-      puts Rainbow('-- debug ----').yellow
+      puts Rainbow("-- debug ----").yellow
       puts "class:"
       p var_name.class
       puts "value:"
@@ -84,7 +94,6 @@ module Convert2Ascii
     end
 
     def full_screen(content)
-
       if !content
         return content
       end
