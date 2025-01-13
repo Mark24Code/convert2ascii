@@ -34,7 +34,6 @@ module Convert2Ascii
       @color_block = args[:color_block] || false
 
       check_packages
-      regist_hooks
     end
 
     def generate(**args)
@@ -43,9 +42,7 @@ module Convert2Ascii
       @color = args[:color] || @color # full
       @color_block = args[:color_block] || @color_block
 
-      if File.directory? @tmpdir
-        FileUtils.remove_entry @tmpdir
-      end
+      remove_tmpdir
       Dir.mkdir(@tmpdir)
       @audio = get_audio_from_video(@tmpdir)
       screenshots_from_video(@tmpdir)
@@ -73,6 +70,8 @@ module Convert2Ascii
 
       puts ""
       puts Rainbow("[info] save success!").green
+    ensure
+      after_clean
     end
 
     def order_frames_path
@@ -99,6 +98,12 @@ module Convert2Ascii
       TerminalPlayer.new(**player_args).play
 
       return true
+    ensure
+      after_clean
+    end
+
+    def after_clean
+      remove_tmpdir
     end
 
     private
@@ -108,12 +113,10 @@ module Convert2Ascii
       CheckFFmpeg.new.check
     end
 
-    def regist_hooks
-      at_exit {
-        if @tmpdir
-          FileUtils.remove_entry @tmpdir
-        end
-      }
+    def remove_tmpdir
+      if File.directory? @tmpdir
+        FileUtils.remove_entry @tmpdir
+      end
     end
 
     def set_threads_count

@@ -12,4 +12,8 @@ class Video2AsciiPlay < Minitest::Test
     @generator.generate
     assert_equal true , @generator.play
   end
+
+  def teardown
+    @generator.after_clean
+  end
 end

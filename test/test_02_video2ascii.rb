@@ -20,4 +20,13 @@ class TestDefaultParams < Minitest::Test
     test_width = 200
     assert_equal test_width , @generator.generate(width: test_width).width
   end
+
+  def test_generate_params
+    test_width = 200
+    assert_equal test_width , @generator.generate(width: test_width).width
+  end
+
+  def teardown
+    @generator.after_clean
+  end
 end
