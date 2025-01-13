@@ -23,7 +23,7 @@ you can use it in your code and make your own ascii art !
 * MacOS 15.2 ✅
 * Ubuntu 24.04 ✅
 * Windows 11  ❌
-
+* Docker ✅
 
 ## Example
 
