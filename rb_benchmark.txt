@@ -1,0 +1,36 @@
+============================================================
+convert2ascii (Ruby) benchmark
+============================================================
+machine          : Apple M4
+machine          : 10 CPUs (Etc.nprocessors=10)
+ruby             : 4.0.1
+gem version      : v0.2.1
+
+video            : videos/demo.mp4
+resolution       : 1280x720
+stream           : 30 fps, 7166 frames, 238.93 s
+size             : 57.24 MB
+
+width            : 80
+step_duration    : 0.04 s (25 fps)
+
+slice threads    : 9
+
+3 runs, wall clock (s):
+                run 1   run 2   run 3     avg
+audio_extract   1.901   1.953   1.944   1.933
+frame_slice     4.075   3.841   3.724   3.880
+ascii_convert   6.811   6.872   6.457   6.713
+meta/other      0.050   0.049   0.048   0.049
+TOTAL generate  12.837  12.716  12.172  12.575
+
+ascii_convert throughput : 5972 frames, ~889.6 frames/s (avg)
+
+expected frames @ 25 fps: 5973 | actual: 5972
+
+(headless run: IO.console stubbed; total conversion time is the PK metric)
+
+resource usage (/usr/bin/time -l, single representative run):
+  real / user / sys     : 14.21 s / 81.91 s / 3.97 s
+  peak RSS              : 176013312 bytes (176 MB max resident set size)
+  peak memory footprint : 32358904 bytes

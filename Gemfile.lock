@@ -9,7 +9,7 @@ PATH
 GEM
   remote: https://rubygems.org/
   specs:
-    minitest (5.25.4)
+    minitest (5.27.0)
     observer (0.1.2)
     parallel (1.26.3)
     pkg-config (1.5.9)
