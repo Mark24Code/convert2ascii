@@ -3,6 +3,7 @@ package convert2ascii
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	"os"
@@ -21,6 +22,11 @@ import (
 
 // DefaultStepDuration mirrors the Ruby DEFAULT_STEP_DURATION (≈25 fps).
 const DefaultStepDuration = 0.04
+
+// audioChanCap bounds the live-audio PCM channel; the decode goroutine blocks
+// (backpressure) once full, so memory stays roughly constant (~a few 100ms of
+// audio).
+const audioChanCap = 16
 
 // VideoOptions configures a Video2Ascii conversion.
 type VideoOptions struct {
@@ -55,6 +61,8 @@ type Video2Ascii struct {
 	// play-mode state (set by Generate, consumed by Play)
 	framesCh    chan string
 	playerErrCh chan error
+	audioStream *audio.StreamParams
+	audioErrCh  chan error
 	cancel      context.CancelFunc
 }
 
@@ -109,9 +117,9 @@ func (v *Video2Ascii) frameRGBA(fr ffmpeg.Frame) *image.RGBA {
 }
 
 // Generate converts the video. With Output set it writes N.txt, audio.wav and
-// meta.json directly into Output. With Output empty it starts streaming
-// rendered frames to the player and returns once audio is ready; call Play to
-// consume the stream.
+// meta.json directly into Output. With Output empty it wires up the live
+// streaming pipeline (rendered frames + real-time audio) and returns
+// immediately — no full-track wait; call Play to consume the stream.
 func (v *Video2Ascii) Generate() error {
 	v.renderOpts = imagelib.Options{
 		Width:      v.Width,
@@ -261,33 +269,22 @@ func renumberFrames(dir string) (int, error) {
 	return len(paths), nil
 }
 
-// generatePlay stages audio to a temp wav and starts a single-segment decode +
-// render pipeline streaming frames to the player. Production is far faster
-// than the ~25 fps the player consumes, so a sequential pipeline is both
-// ordered and O(1) memory.
+// generatePlay wires up the live streaming pipeline: a single-segment decode +
+// render goroutine streaming frames to the player, plus (when the file has
+// audio) a PCM channel feeding a stream player. Production is far faster than
+// the ~25 fps the player consumes, so a sequential pipeline is both ordered and
+// O(1) memory. It returns as soon as the pipeline is wired — there is no
+// full-track wait — and Play consumes the stream. Both decoders start at media
+// time 0, so when playback starts the audio clock and frame index align.
 func (v *Video2Ascii) generatePlay(info ffmpeg.ProbeInfo, tw, th int) error {
-	var wf *os.File
-	if info.HasAudio {
-		f, err := os.CreateTemp("", "convert2ascii-audio-*.wav")
-		if err != nil {
-			return err
-		}
-		wf = f
-		v.audioPath = f.Name()
-	}
-	audioCh := make(chan error, 1)
-	go func() {
-		if wf == nil {
-			audioCh <- nil
-			return
-		}
-		audioCh <- v.extractAudio(wf, info)
-	}()
-
 	v.framesCh = make(chan string, 4)
 	v.playerErrCh = make(chan error, 1)
+	v.audioStream = nil
+	v.audioErrCh = nil
 	ctx, cancel := context.WithCancel(context.Background())
 	v.cancel = cancel
+
+	// Video: sequential (segCount=1) decode + render, streaming frames.
 	go func() {
 		defer close(v.framesCh)
 		err := ffmpeg.DecodeFramesParallel(v.URI, v.StepDuration, 1, tw, th, func(fr ffmpeg.Frame) error {
@@ -305,20 +302,37 @@ func (v *Video2Ascii) generatePlay(info ffmpeg.ProbeInfo, tw, th int) error {
 		v.playerErrCh <- err
 	}()
 
-	// Join audio so Play can use it immediately.
-	if err := <-audioCh; err != nil {
-		cancel()
-		<-v.playerErrCh // wait for the pipeline to stop
-		if v.audioPath != "" {
-			_ = os.Remove(v.audioPath)
-			v.audioPath = ""
+	// Audio: decode PCM chunks into a bounded channel consumed by the stream
+	// player. Cancellation stops the send (and thus the decoder); the channel is
+	// always closed so the oto reader gets EOF.
+	if info.HasAudio {
+		pcmCh := make(chan []byte, audioChanCap)
+		v.audioStream = &audio.StreamParams{
+			SampleRate: info.AudioSampleRate,
+			Channels:   info.AudioChannels,
+			PCM:        pcmCh,
 		}
-		return fmt.Errorf("extract audio: %w", err)
-	}
-	if wf != nil {
-		wf.Close()
+		v.audioErrCh = make(chan error, 1)
+		go func() {
+			defer close(pcmCh)
+			v.audioErrCh <- v.streamAudio(ctx, pcmCh, info)
+		}()
 	}
 	return nil
+}
+
+// streamAudio decodes the audio track to interleaved S16 PCM chunks sent to ch.
+// Sends select on ctx.Done so cancellation unblocks a full channel.
+func (v *Video2Ascii) streamAudio(ctx context.Context, ch chan<- []byte, info ffmpeg.ProbeInfo) error {
+	_, _, err := ffmpeg.DecodeAudioStream(v.URI, func(pcm []byte) error {
+		select {
+		case ch <- pcm:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	})
+	return err
 }
 
 func (v *Video2Ascii) extractAudio(wf *os.File, info ffmpeg.ProbeInfo) error {
@@ -345,7 +359,17 @@ func (v *Video2Ascii) Play(playLoop bool) error {
 	defer func() {
 		if v.cancel != nil {
 			v.cancel()
-			<-v.playerErrCh // wait for the pipeline to stop
+			<-v.playerErrCh // wait for the video pipeline to stop
+			if v.audioErrCh != nil {
+				select {
+				case err := <-v.audioErrCh:
+					if err != nil && !errors.Is(err, context.Canceled) {
+						fmt.Fprintf(os.Stderr, "[warn] audio stream ended: %v\n", err)
+					}
+				default:
+					// audio decode is still winding down; it observes cancel and exits
+				}
+			}
 		}
 		if v.audioPath != "" {
 			_ = os.Remove(v.audioPath)
@@ -353,7 +377,7 @@ func (v *Video2Ascii) Play(playLoop bool) error {
 	}()
 	p := &Player{
 		FrameStream:  v.framesCh,
-		AudioPath:    v.audioPath,
+		AudioStream:  v.audioStream,
 		StepDuration: v.StepDuration,
 		PlayLoop:     playLoop,
 	}

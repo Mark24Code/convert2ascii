@@ -103,6 +103,114 @@ func (c *sampleCounter) Read(buf []byte) (int, error) {
 	return n * pcmFrameBytes, nil
 }
 
+// StreamParams carries the metadata and PCM source for live audio streaming
+// (the play path that skips the temp-WAV round-trip).
+type StreamParams struct {
+	SampleRate int           // audio sample rate in Hz
+	Channels   int           // 1 (mono) or 2 (stereo); oto only accepts 1 or 2
+	PCM        <-chan []byte // interleaved S16 little-endian chunks
+}
+
+// pcmStreamer adapts a channel of interleaved S16 PCM to beep's stereo float64
+// Streamer. Mono sources are up-mixed to stereo (matching beep's file
+// decoders). In loop mode every consumed chunk is buffered and replayed after
+// the channel closes, so memory grows with the full track — the same documented
+// trade-off as streamSource in the player package.
+//
+// pcmStreamer is not goroutine-safe; it is only driven through
+// sampleCounter.Read, which serializes access under its own mutex.
+type pcmStreamer struct {
+	ch       <-chan []byte
+	loop     bool
+	channels int // 1 or 2
+
+	pending []byte   // unconsumed bytes of the current chunk
+	loopBuf [][]byte // every consumed chunk, for loop replay
+	loopPos int
+	ended   bool
+}
+
+// Stream fills samples from the PCM channel, blocking when the channel is empty
+// (backpressure on the decoder). Returns (n, false) at EOF when not looping; in
+// loop mode it wraps back into the buffered chunks.
+func (s *pcmStreamer) Stream(samples [][2]float64) (int, bool) {
+	out := 0
+	for out < len(samples) {
+		if len(s.pending) == 0 {
+			if s.ended {
+				if s.loop && len(s.loopBuf) > 0 {
+					s.pending = s.loopBuf[s.loopPos]
+					s.loopPos++
+					if s.loopPos >= len(s.loopBuf) {
+						s.loopPos = 0
+					}
+					continue
+				}
+				break
+			}
+			chunk, ok := <-s.ch
+			if !ok {
+				s.ended = true
+				continue
+			}
+			if s.loop {
+				s.loopBuf = append(s.loopBuf, chunk)
+			}
+			s.pending = chunk
+		}
+		frameBytes := s.channels * 2
+		if len(s.pending) < frameBytes {
+			// Partial frame at a chunk boundary; ffmpeg always emits aligned
+			// chunks, so this is defensive only.
+			s.pending = nil
+			continue
+		}
+		l := float64(int16(uint16(s.pending[0])|uint16(s.pending[1])<<8)) / 32768.0
+		r := l
+		if s.channels == 2 {
+			r = float64(int16(uint16(s.pending[2])|uint16(s.pending[3])<<8)) / 32768.0
+		}
+		samples[out] = [2]float64{l, r}
+		s.pending = s.pending[frameBytes:]
+		out++
+	}
+	if out == 0 {
+		return 0, false
+	}
+	return out, true
+}
+
+func (s *pcmStreamer) Err() error { return nil }
+
+// NewStreamPlayer builds a Player that streams interleaved S16 PCM from the
+// channel to the audio device in real time, with the same 50ms oto buffer and
+// sample-counter clock as NewPlayer, so Position() remains a valid A/V master
+// clock. If loop is true the stream is buffered as it is consumed and replayed
+// after the channel closes.
+func NewStreamPlayer(sp StreamParams, loop bool) (*Player, error) {
+	if sp.SampleRate <= 0 {
+		return nil, fmt.Errorf("audio: invalid sample rate %d", sp.SampleRate)
+	}
+	if sp.Channels < 1 || sp.Channels > 2 {
+		return nil, fmt.Errorf("audio: unsupported channel count %d", sp.Channels)
+	}
+	if sp.PCM == nil {
+		return nil, errors.New("audio: nil PCM channel")
+	}
+	src := &pcmStreamer{ch: sp.PCM, channels: sp.Channels, loop: loop}
+	ctx, ready, err := oto.NewContext(sp.SampleRate, channelCount, bitDepthInBytes)
+	if err != nil {
+		return nil, err
+	}
+	<-ready
+	counter := &sampleCounter{Streamer: src, rate: float64(sp.SampleRate)}
+	out := ctx.NewPlayer(counter)
+	if bs, ok := out.(oto.BufferSizeSetter); ok {
+		bs.SetBufferSize(int(float64(sp.SampleRate)*bufferSeconds) * pcmFrameBytes)
+	}
+	return &Player{ctx: ctx, out: out, counter: counter}, nil
+}
+
 // NewPlayer opens path (wav or mp3) and prepares an oto player. If loop is
 // true, the audio repeats indefinitely.
 func NewPlayer(path string, loop bool) (*Player, error) {

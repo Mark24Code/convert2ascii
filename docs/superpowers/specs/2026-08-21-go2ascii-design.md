@@ -196,7 +196,7 @@ beep + oto 全 Go 播放(wav/mp3 均可解),**替换 ffplay** —— 运行时�
 
 - `--loop` 帧号取模。
 - Ctrl-C → 清理(关备用屏、显光标、清屏)并退出 0(`signal.NotifyContext`)。
-- 帧仍一次性载入内存(与 Ruby 对齐;TODO 保留流式读取改进项)。
+- 帧流式:实时播放路径按帧流式喂入(channel,内存 O(1)),`-p` 逐帧从磁盘读;仅程序化传入 `Frames` slice 时一次性载入内存。
 - 终端尺寸用 `golang.org/x/term` GetSize。
 
 ## 7. 构建、依赖、测试、错误处理
@@ -228,7 +228,7 @@ cgo 需 FFmpeg 开发头文件(`brew install ffmpeg` + pkg-config);macOS 运行�
 ## 8. 非目标(本期不做)
 
 - 播放控制按键(pause/next/prev/exit)—— Ruby TODO 中同样未做。
-- 帧流式读取(内存上限问题)—— 结构上预留,不做。
+- ~~帧流式读取~~ —— 已在 realtime 分支落地:播放路径逐帧流式解码渲染 + 自适应预缓存 + 音频实时流式直送声卡(见 §6.4、README)。
 - Windows 支持 —— Ruby 同样不支持。
 - 与 Ruby 逐字节相同的 ASCII 输出 —— 解码器/缩放器不同,保证功能等价而非字节相同。
 

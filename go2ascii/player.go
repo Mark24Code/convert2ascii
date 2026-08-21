@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/Mark24Code/convert2ascii/go2ascii/internal/audio"
 	"github.com/Mark24Code/convert2ascii/go2ascii/internal/player"
 )
 
@@ -17,6 +18,7 @@ type Player struct {
 	FrameStream  <-chan string
 	FrameDir     string
 	AudioPath    string
+	AudioStream  *audio.StreamParams // live PCM stream (play path); takes precedence over AudioPath
 	StepDuration float64
 	PlayLoop     bool
 	Debug        bool
@@ -29,6 +31,7 @@ func (p *Player) Play() error {
 		FrameStream:  p.FrameStream,
 		FrameDir:     p.FrameDir,
 		AudioPath:    p.AudioPath,
+		AudioStream:  p.AudioStream,
 		StepDuration: p.StepDuration,
 		PlayLoop:     p.PlayLoop,
 		Debug:        p.Debug,

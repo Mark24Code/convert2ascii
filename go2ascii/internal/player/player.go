@@ -46,6 +46,7 @@ type Options struct {
 	FrameStream  <-chan string
 	FrameDir     string
 	AudioPath    string
+	AudioStream  *audio.StreamParams // live PCM stream (play path); takes precedence over AudioPath
 	StepDuration float64
 	PlayLoop     bool
 	Debug        bool
@@ -182,6 +183,99 @@ func (o Options) source() (frameSource, error) {
 	}
 }
 
+// Pre-buffer tuning for the live streaming (FrameStream) path. Playback starts
+// once the adaptive target is banked (or maxStartupWait elapses), so decode and
+// render jitter does not show up as startup stutter.
+const (
+	minPrebufferFrames  = 4               // smallest cache, even at very fast production
+	maxPrebufferSeconds = 2.5             // cache capped at this many seconds of playback
+	maxStartupWait      = 3 * time.Second // give up filling the cache after this
+)
+
+// targetPrebufferFrames returns how many frames to bank before starting
+// playback, given the measured production interval produceInterval (seconds per
+// produced frame) and the playback step. Production slower than realtime
+// (produceInterval > step) banks more so a slow pipeline has a cushion at
+// startup; fast production banks the minimum so playback starts sooner.
+// Clamped to [minPrebufferFrames, maxPrebufferSeconds of playback].
+func targetPrebufferFrames(produceInterval, step float64) int {
+	maxFrames := max(minPrebufferFrames, int(maxPrebufferSeconds/step))
+	t := int(produceInterval / step * float64(maxFrames))
+	return min(maxFrames, max(minPrebufferFrames, t))
+}
+
+// prebufferSource serves buffered frames first, then delegates to src. Play()
+// wraps a live frameSource with it to pre-fill a cache before the display loop
+// starts; the main loop and loop-mode wrapping (count()) are untouched.
+type prebufferSource struct {
+	src frameSource
+	buf []string
+}
+
+func (p *prebufferSource) next() (string, bool) {
+	if len(p.buf) > 0 {
+		s := p.buf[0]
+		p.buf = p.buf[1:]
+		return s, true
+	}
+	return p.src.next()
+}
+
+func (p *prebufferSource) count() int { return p.src.count() }
+
+// fillPrebuffer pulls frames from src into pb.buf until the adaptive target is
+// met, maxStartupWait elapses, or the source ends. Production speed is measured
+// from frames after the first (cold-start) frame and smoothed with an EMA. The
+// deadline is checked between pulls, so the real wait can overshoot by up to
+// one production interval.
+func fillPrebuffer(pb *prebufferSource, step float64) {
+	deadline := time.Now().Add(maxStartupWait)
+	var ema float64 // seconds per produced frame
+
+	first, ok := pb.src.next()
+	if !ok {
+		return
+	}
+	pb.buf = append(pb.buf, first)
+	last := time.Now()
+
+	for len(pb.buf) < minPrebufferFrames {
+		if time.Now().After(deadline) {
+			return
+		}
+		nxt, ok := pb.src.next()
+		if !ok {
+			return
+		}
+		pb.buf = append(pb.buf, nxt)
+		if dt := time.Since(last).Seconds(); dt > 0 {
+			if ema == 0 {
+				ema = dt
+			} else {
+				ema = ema*0.5 + dt*0.5
+			}
+		}
+		last = time.Now()
+	}
+
+	target := targetPrebufferFrames(ema, step)
+	for len(pb.buf) < target {
+		if time.Now().After(deadline) {
+			return
+		}
+		nxt, ok := pb.src.next()
+		if !ok {
+			return
+		}
+		pb.buf = append(pb.buf, nxt)
+		if dt := time.Since(last).Seconds(); dt > 0 {
+			ema = ema*0.5 + dt*0.5
+			target = targetPrebufferFrames(ema, step)
+		}
+		last = time.Now()
+	}
+}
+
 // Player plays frames with optional audio.
 type Player struct {
 	opts Options
@@ -199,7 +293,14 @@ func (p *Player) Play() error {
 	}
 
 	var clock AudioClock
-	if o.AudioPath != "" {
+	if o.AudioStream != nil {
+		ap, err := audio.NewStreamPlayer(*o.AudioStream, o.PlayLoop)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[warn] audio unavailable, playing without audio: %v\n", err)
+		} else {
+			clock = ap
+		}
+	} else if o.AudioPath != "" {
 		ap, err := audio.NewPlayer(o.AudioPath, o.PlayLoop)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "[warn] audio unavailable, playing without audio: %v\n", err)
@@ -208,8 +309,9 @@ func (p *Player) Play() error {
 		}
 	}
 
-	// First frame; the source pulls it, so live playback starts as soon as the
-	// producer emits the first rendered frame.
+	// First frame; the source pulls it, so live playback can begin as soon as
+	// the producer emits the first rendered frame (the pre-buffer below then
+	// banks more frames before the first draw).
 	current, ok := src.next()
 	if !ok {
 		return errors.New("[Error] frame's length must be >= 0")
@@ -217,6 +319,20 @@ func (p *Player) Play() error {
 
 	if !term.IsTerminal(int(os.Stdout.Fd())) {
 		return errors.New("play requires an interactive terminal (stdout is not a tty)")
+	}
+
+	step := o.StepDuration
+	if step <= 0 {
+		step = 0.04
+	}
+
+	// Live streams: pre-fill a cache so decode/render jitter does not show as
+	// startup stutter. Playback starts as soon as the adaptive target is met or
+	// the bounded wait elapses; the main loop below is unchanged.
+	if o.FrameStream != nil {
+		pb := &prebufferSource{src: src}
+		fillPrebuffer(pb, step)
+		src = pb
 	}
 
 	screen, err := tcell.NewScreen()
@@ -282,10 +398,6 @@ func (p *Player) Play() error {
 		clock.Play()
 	}
 
-	step := o.StepDuration
-	if step <= 0 {
-		step = 0.04
-	}
 	start := time.Now()
 	frameIndex := 0
 

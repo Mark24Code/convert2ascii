@@ -1,6 +1,7 @@
 package player
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -117,5 +118,96 @@ func TestRenderFrame(t *testing.T) {
 	fg, _, _ := st.Decompose()
 	if fg != tcell.NewRGBColor(255, 0, 0) {
 		t.Fatalf("fg = %v", fg)
+	}
+}
+
+// stubSource is a minimal frameSource for exercising the pre-buffer logic.
+type stubSource struct {
+	frames []string
+	pos    int
+	ended  bool
+}
+
+func (s *stubSource) next() (string, bool) {
+	if s.ended || s.pos >= len(s.frames) {
+		return "", false
+	}
+	f := s.frames[s.pos]
+	s.pos++
+	if s.pos >= len(s.frames) {
+		s.ended = true
+	}
+	return f, true
+}
+
+func (s *stubSource) count() int { return len(s.frames) }
+
+func TestTargetPrebufferFrames(t *testing.T) {
+	step := 0.04
+	maxFrames := max(minPrebufferFrames, int(maxPrebufferSeconds/step))
+	cases := []struct {
+		interval float64
+		want     int
+	}{
+		{0.0001, minPrebufferFrames}, // very fast -> bank the minimum
+		{0.001, minPrebufferFrames},
+		{0.005, 7},
+		{0.02, 31},
+		{0.04, maxFrames}, // realtime (25fps) banks the full cushion
+		{0.2, maxFrames},  // slower than realtime clamps to the cap
+	}
+	for _, c := range cases {
+		if got := targetPrebufferFrames(c.interval, step); got != c.want {
+			t.Fatalf("interval %v: got %d, want %d", c.interval, got, c.want)
+		}
+	}
+	// monotonic non-decreasing as production slows
+	prev := 0
+	for _, iv := range []float64{0.0001, 0.001, 0.005, 0.02, 0.04, 0.1, 0.5} {
+		got := targetPrebufferFrames(iv, step)
+		if got < prev {
+			t.Fatalf("not monotonic at %v: %d < %d", iv, got, prev)
+		}
+		prev = got
+	}
+}
+
+func TestPrebufferSourceServesBufferThenDelegates(t *testing.T) {
+	stub := &stubSource{frames: []string{"a", "b", "c"}}
+	pb := &prebufferSource{src: stub, buf: []string{"x", "y"}}
+	for _, want := range []string{"x", "y", "a", "b", "c"} {
+		got, ok := pb.next()
+		if !ok || got != want {
+			t.Fatalf("next() = %q, %v; want %q", got, ok, want)
+		}
+	}
+	if _, ok := pb.next(); ok {
+		t.Fatal("expected EOF after exhausting source")
+	}
+	if pb.count() != 3 {
+		t.Fatalf("count() = %d, want 3", pb.count())
+	}
+}
+
+func TestFillPrebufferBanksMinWhenFast(t *testing.T) {
+	frames := make([]string, 10)
+	for i := range frames {
+		frames[i] = fmt.Sprintf("f%d", i)
+	}
+	pb := &prebufferSource{src: &stubSource{frames: frames}}
+	fillPrebuffer(pb, 0.04)
+	if len(pb.buf) < minPrebufferFrames {
+		t.Fatalf("buffered %d, want >= %d", len(pb.buf), minPrebufferFrames)
+	}
+	if len(pb.buf) >= len(frames) {
+		t.Fatalf("fast production should stop early, buffered all %d", len(pb.buf))
+	}
+}
+
+func TestFillPrebufferStopsAtSourceEnd(t *testing.T) {
+	pb := &prebufferSource{src: &stubSource{frames: []string{"a", "b"}}}
+	fillPrebuffer(pb, 0.04)
+	if len(pb.buf) != 2 {
+		t.Fatalf("buffered %d, want 2", len(pb.buf))
 	}
 }
