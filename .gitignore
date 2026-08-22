@@ -11,3 +11,6 @@
 demo
 dist
 *.gem
+
+# go2ascii build output
+go2ascii/bin/

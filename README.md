@@ -1,153 +1,111 @@
-# Convert2Ascii
+# go2ascii
 
-Convert Image/Video to ASCII art.
+Go 版 convert2ascii：把图片 / 视频在终端里渲染为 ASCII art。提供两个 CLI：`image2ascii`（单张图片）与 `video2ascii`（视频，支持生成、保存、播放）。
 
+## Build
 
-## Intro
-
-convert2ascii provides two executable commands：
-
-* image2ascii: transform picture to ascii art and display in terminal.
-* video2ascii: transform video to ascii art, you can save or play it in terminal.
-
-It also provides classes as a gem:
-
-* Convert2Ascii::Image2Ascii
-* Convert2Ascii::Video2Ascii
-
-you can use it in your code and make your own ascii art !
-
-
-## Test pass
-
-* MacOS 15.2 ✅
-* Ubuntu 24.04 ✅
-* Windows 11  ❌
-* Docker ✅
-
-## Example
-
-* Black Myth: Wukong
-
-![example](./example/wukong.jpg)
-
-* The Matrix: Neo
-
-![neo](./example/neo.gif)
-
-## Prerequisites
-
-* Ruby 3+
-* ImageMagick ([Download here](https://imagemagick.org/script/download.php))
-* ffmpeg ([Download here](https://www.ffmpeg.org/))
-
-# How to use
-
-## Try in Docker
-
-`$ docker run -it -v $(pwd):/app  mark24code/convert2ascii bash -c "cd /app && exec bash"`
-
->  `$(pwd)` can be changed to your local path. Here, use your working path.
+需要 Go ≥ 1.25 与 FFmpeg ≥ 6 开发库：
 
 ```bash
-# image
-image2ascii -i </path/to/image>
-
-# video 
-video2ascii -i </path/to/video.mp4>
+brew install ffmpeg      # macOS（含开发头文件）
+make build               # 产出 bin/image2ascii 与 bin/video2ascii
 ```
 
+## Usage
 
-## Install
-
-`$ gem install convert2ascii`
-
-
-## Executable commands
-
-### image2ascii
-
-Convert an image to ascii art.
+### image2ascii —— 图片转 ASCII
 
 ```bash
-image2ascii -h
-Usage: image2ascii [options]
-        --version                    version
-    -i, --image=URI                  image uri (required)
-    -w, --width=WIDTH                image width (integer)
-    -s, --style=STYLE                ascii style: 'color'/'text'
-    -b, --block                      ascii color style use BLOCK or not true/false
+bin/image2ascii -i <image> [-w WIDTH] [-s color|text] [-b]
 ```
-
-### video2ascii
-
-Convert a video to ascii art.
 
 ```bash
-Usage: video2ascii [options]
+# 直接输出到终端（默认彩色，宽度为终端列数）
+bin/image2ascii -i bin/rocket.jpg
 
-* By default, it will generate and play without saving.
-* The -p option will just play the ascii frames within the directory, and ignore -i, -o other options. --loop will play loop
-* -i,-o will just generate and output frames and ignore others options
-        --version                    version
-    -i, --input=URI                  video uri (required)
-    -w, --width=WIDTH                video width (integer)
-    -s, --style=STYLE                ascii style: ['color'| 'text']
-    -b, --block                      ascii color style use BLOCK or not [ true | false ]
-    -o, --ouput=OUTPUT               save ascii frames to the output directory
-    -p, --play_dir=PLAY_DIRNAME      input the ascii frames directory to play
-        --loop
+# 指定宽度、文本风格
+bin/image2ascii -i bin/rocket.jpg -w 80 -s text
 ```
 
+### video2ascii —— 视频转 ASCII
 
-## As a Gem
+三种模式：
 
-### Convert2Ascii::Image2Ascii
+**1. 播放（默认）**—— 转码的同时实时在终端播放（含音频）：
 
-
-```ruby
-require 'convert2ascii/image2ascii'
-
-# generate image
-uri = "path/to/image"
-ascii = Convert2Ascii::Image2Ascii.new(uri:, width: 50)
-
-# generate image
-ascii.generate
-# display in your terminal
-ascii.tty_print
-
-
-# also chain call
-ascii.generate.tty_print
-
+```bash
+bin/video2ascii -i <video> [-w WIDTH] [-s color|text] [-b]
 ```
 
+**2. 生成并保存** —— 把帧写入指定目录（`N.txt` + `audio.wav` + `meta.json`），不播放：
 
-### Convert2Ascii::Video2Ascii
-
-```ruby
-require 'convert2ascii/video2ascii'
-
-# generate video
-uri = "path/to/video.mp4"
-ascii = Convert2Ascii::Video2Ascii.new(uri:, width: 50)
-# generate video
-ascii.generate
-# save frames
-ascii.save(output_path)
-
-# play in terminal
-ascii.play
-
-
-# chain call
-ascii.generate.play
-
+```bash
+bin/video2ascii -i <video> -o <DIR> [-w WIDTH] [-s color|text] [-b]
 ```
 
+**3. 播放已保存的帧目录**：
 
-## Inspired by
+```bash
+bin/video2ascii -p <frames_dir> [--loop]
+```
 
-* [michaelkofron/image2ascii](https://github.com/michaelkofron/image2ascii)
-* [andrewcohen/video_to_ascii](https://github.com/andrewcohen/video_to_ascii)
+```bash
+# 例子：生成 + 保存，再重放
+bin/video2ascii -i videos/demo.mp4 -w 80 -s text -o /tmp/ascii_frames
+bin/video2ascii -p /tmp/ascii_frames
+bin/video2ascii -p /tmp/ascii_frames --loop   # 循环播放
+```
+
+### 选项一览
+
+| 选项 | 说明 |
+|---|---|
+| `-i, --image / --input` | 图片 / 视频路径（必填） |
+| `-w, --width` | 输出宽度（字符数）；缺省为终端列数 |
+| `-s, --style` | `color`（彩色，默认）或 `text`（纯字符） |
+| `-b, --block` | 彩色模式下使用实心色块 |
+| `-o, --output` | video：把帧保存到该目录（不播放） |
+| `-p, --play_dir` | video：播放已生成的帧目录（忽略 `-i`/`-o`） |
+| `--loop` | 配合 `-p` 循环播放 |
+| `--version` | 打印版本信息 |
+
+## Performance
+
+内置基准测试，按阶段打印耗时并对比全流程（处理期间音频与视频并行、存在重叠）：
+
+```bash
+go run ./cmd/bench <video> [width] [style]
+```
+
+本机实测（Apple Silicon，10 核，Go 1.27）：
+
+> 测试视频 `test/assets/fireworks.mp4`（1280×720，8.72 s，含音频），宽度 80（输出 80×22），25 fps
+
+| 阶段 | 耗时 | 吞吐 |
+|---|---|---|
+| 音频提取 | 0.017 s | — |
+| 视频帧提取 | 0.204 s | 1024 帧/s |
+| ASCII 转换 | 0.017 s | 12072 帧/s |
+| **全流程（Generate 总耗时）** | **0.219 s** | ≈ **40× 实时** |
+
+- 8.72 s 的视频全流程生成只要 0.22 s，远快于播放速度，因此默认模式能边处理边实时播放。
+- 生成 + 保存模式直接写目标目录、播放模式逐帧从磁盘读取，内存占用与视频时长无关——超长视频也不会因内存增长而卡顿。
+
+> 性能受机器、视频分辨率与宽度影响：宽度越大、分辨率越高耗时越长。可按需自测上面的 bench 命令。
+
+## Test
+
+```bash
+make test            # go test ./...；需 FFmpeg 开发库
+go test -race ./...  # 含并行解码的竞态检测
+```
+
+## Version
+
+```bash
+bin/image2ascii --version
+bin/video2ascii --version
+```
+
+- 版本：v0.1.0
+- 项目：<https://github.com/Mark24Code/convert2ascii>
