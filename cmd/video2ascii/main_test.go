@@ -2,23 +2,16 @@ package main
 
 import "testing"
 
-func TestParseVideoArgsPlayDir(t *testing.T) {
-	a, err := parseVideoArgs([]string{"-p", "frames", "--loop"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if a.playDir != "frames" || !a.loop {
-		t.Fatalf("a=%+v", a)
-	}
-}
-
-func TestParseVideoArgsOutputAlias(t *testing.T) {
-	a, err := parseVideoArgs([]string{"-i", "a.mp4", "--output", "out"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if a.input != "a.mp4" || a.output != "out" {
-		t.Fatalf("a=%+v", a)
+func TestParseVideoArgsRemovedFlagsRejected(t *testing.T) {
+	for _, args := range [][]string{
+		{"-o", "out"},
+		{"--output", "out"},
+		{"-p", "frames"},
+		{"--play_dir", "frames"},
+	} {
+		if _, err := parseVideoArgs(args); err == nil {
+			t.Fatalf("expected error for removed flag %v", args)
+		}
 	}
 }
 
